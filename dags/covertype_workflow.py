@@ -171,7 +171,6 @@ def train_and_log_models():
         "random_forest": RandomForestClassifier(n_estimators=100, random_state=42),
         "decision_tree": DecisionTreeClassifier(),
         "extra_trees": ExtraTreesClassifier(n_estimators=100, random_state=42),
-        "svm": SVC(kernel="linear", probability=True),
         "logistic_regression": LogisticRegression(max_iter=1000)
     }
 
