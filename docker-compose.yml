@@ -347,10 +347,11 @@ services:
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=supersecret
     deploy:
+      replicas: 3 #Incrementa el número de replicas
       resources:
         limits:
           memory: 1000M
-          cpus: "2"
+          cpus: "1.5"
     networks:
       - mlops_net
 
