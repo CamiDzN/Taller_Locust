@@ -350,7 +350,7 @@ services:
       resources:
         limits:
           memory: 1000M
-          cpus: "1.5"
+          cpus: "2"
     networks:
       - mlops_net
 
