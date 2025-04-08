@@ -335,9 +335,6 @@ services:
   ################################################################
   fastapi:
     image: camidzn/mlops:api-inference
-    container_name: fastapi_service
-    ports:
-      - "8081:8081"
     volumes:
       - models_volume:/opt/airflow/models
     depends_on:

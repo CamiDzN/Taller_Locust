@@ -7,7 +7,7 @@ services:
     ports:
       - "8089:8089"
     environment:
-      - LOCUST_HOST=http://fastapi_service:8081
+      - LOCUST_HOST=http://fastapi:8081
     networks:
       - taller_locust_mlops_net
 
