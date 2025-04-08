@@ -334,7 +334,7 @@ services:
   # FastAPI - Inferencia
   ################################################################
   fastapi:
-    build: ./fastapi
+    image: camidzn/mlops:api-inference
     container_name: fastapi_service
     ports:
       - "8081:8081"
