@@ -14,5 +14,5 @@ services:
       - mlops_net
 
 networks:
-  mlops_net:
+  taller_locust_mlops_net:
     external: true
