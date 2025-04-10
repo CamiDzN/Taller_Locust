@@ -1,142 +1,332 @@
-# Proyecto MLOps: Entrenamiento y Despliegue de Modelos con Airflow, MLflow y FastAPI
-
-## 1. Descripción General del Proyecto
-
-Este proyecto implementa una arquitectura MLOps que automatiza todo el ciclo de vida de un modelo de machine learning, desde la recolección de datos hasta su despliegue en un API REST para inferencia.
-
-El objetivo es recolectar datos sintéticos del dataset *Covertype* desde una API, procesarlos, entrenar varios modelos, seleccionar el mejor según su rendimiento y desplegarlo automáticamente en producción, todo mediante un DAG de Apache Airflow.
-
-El proyecto busca ilustrar cómo herramientas como Airflow, MLflow, MinIO, MySQL y FastAPI pueden integrarse para gestionar de manera escalable, reproducible y trazable experimentos de machine learning.
-
-## 2. Arquitectura y Servicios (Docker Compose)
-
-La arquitectura está conformada por los siguientes servicios desplegados mediante Docker Compose y conectados en la red `mlops_net` a excepción del Random Data API que se conecta via Internet (IP):
-
-- **Airflow**: orquesta el flujo de trabajo del ML pipeline mediante un DAG. Utiliza PostgreSQL como base de metadatos y Redis como broker.
-- **PostgreSQL**: almacena la metadata de Airflow.
-- **Redis**: gestiona la cola de tareas de Celery para Airflow.
-- **MySQL**: almacena los datos crudos y preprocesados del dataset, y también sirve como backend de MLflow.
-- **MinIO**: sistema de almacenamiento de artefactos compatible con S3 (se usa como store de modelos para MLflow).
-- **MLflow**: servidor de tracking y Model Registry para registrar experimentos y modelos.
-- **FastAPI**: API REST para servir el modelo entrenado y realizar predicciones.
-- **Random Data API**: servicio auxiliar que simula la generación incremental de datos del dataset Covertype.
-
-![image](https://github.com/user-attachments/assets/c301c903-1fa1-492a-9945-3dd5a5513cef)
 
 
-## 3. Tareas del DAG `covertype_workflow`
+# Taller Locust - Pruebas de Carga para API de Inferencia
 
-El DAG principal define 5 tareas:
+Este proyecto desarrolla una API de inferencia utilizando **FastAPI**, conectada a un modelo gestionado con **MLflow**, y realiza pruebas de carga con **Locust** para evaluar el uso de recursos y la escalabilidad de la solución.
 
-1. **clear_training_data_tables**: elimina las tablas previas de datos crudos y preprocesados en MySQL.
-2. **collect_data**: llama a la API de datos aleatorios y guarda los resultados en la tabla `covertype_raw`.
-3. **preprocess_data**: limpia los datos, escala las variables numéricas y guarda los datos en la tabla `covertype_preprocessed`.
-4. **train_models**: entrena varios modelos, registra los resultados en MLflow y promueve el mejor a "Production".
-5. **notify_api_reload**: notifica al servicio FastAPI para recargar el último modelo de MLflow.
+---
 
-![image](https://github.com/user-attachments/assets/e8ce7ada-d84e-4ee4-8d08-e059a5322c96)
+## Arquitectura del Proyecto
 
+La solución está compuesta por los siguientes servicios orquestados con **Docker Compose** y conectados en la red `mlops_net`:
 
-## 4. Registro de Modelos y Artefactos con MLflow
+- **Airflow**: Orquesta el flujo del pipeline de ML.  
+- **PostgreSQL**: Almacena los metadatos de Airflow.  
+- **Redis**: Gestiona la cola de tareas.  
+- **MySQL**: Backend de datos y MLflow.  
+- **MinIO**: Almacenamiento de artefactos tipo S3.  
+- **MLflow**: Gestor y servidor de modelos.  
+- **FastAPI**: Servidor que expone el modelo para realizar inferencias.  
+- **Locust**: Realiza pruebas de carga.  
+- **Random Data API**: Genera datos simulados para pruebas.
 
-- MLflow está configurado para usar **MySQL** como backend store (`mlflow_db`) y **MinIO** como artifact store (`s3://mlflows3/artifacts`).
-- Cada ejecución del DAG crea un nuevo *run* con los siguientes elementos registrados:
-  - Hiperparámetros del modelo
-  - Métrica de accuracy
-  - Modelo serializado (formato `mlflow.sklearn`)
-- El mejor modelo se registra en el **Model Registry** bajo el nombre `CovertypeModel`, y se promueve automáticamente al stage **Production**.
+![image](https://github.com/user-attachments/assets/1e6b786c-10cd-4fbd-8a26-f886c211a674)
 
-## 5. API de Inferencia (FastAPI)
+---
 
-La API corre en http://localhost:8081 y ofrece los siguientes endpoints:
-
-POST /predict/: recibe un JSON con las 10 variables numéricas y retorna la clase Cover_Type predicha.
-
-POST /reload_models/: recarga los modelos en memoria desde MLflow.
-
-Swagger disponible en: http://localhost:8081/docs
-
-![image](https://github.com/user-attachments/assets/f0769a60-5b49-4049-b267-90ed5cb7a2ba)
-
-![image](https://github.com/user-attachments/assets/10cb1e9b-d682-4bc4-9c44-92bfc6ae6850)
-
-
-## 6. Despliegue del Proyecto
-
-### Estructura de Carpetas
+## Estructura del Proyecto
 
 ```
-MLOps-Proyecto2
-├── Data/
-│   ├── covertype.csv
-│   └── timestamps.json
-├── dags/
-│   ├── covertype_workflow.py
+Taller_Locust/
 ├── airflow/
-│   ├── Dockerfile
-│   └── requirements.txt
+├── dags/
+├── Data/
 ├── fastapi/
 │   ├── Dockerfile
-│   ├── app.py
-│   └── requirements.txt
-├── logs/
-│   ├── dag_id=covertype_workflow/
-│   ├── dag_processor_manager/
-│   └── scheduler/
-├── minio/
-│   ├── .minio.sys/
-│   └── mlflows3/artifacts/0/
+│   ├── main.py
+│   ├── requirements.txt
+├── locust/
+│   ├── Dockerfile.locust
+│   ├── locustfile.py
+│   ├── requirements-locust.txt
 ├── mlflow/
-│   └── Dockerfile
 ├── mysql-init/
-│   └── init.sql
 ├── random-data-api/
 │   ├── Dockerfile
 │   ├── main.py
-│   └── requirements.txt
+│   ├── requirements.txt
 ├── .env
+├── .gitattributes
+├── docker-compose.yml
+├── docker-compose.locust.yaml
 ├── README.md
-└── docker-compose.yml
 ```
 
-### Pasos para Desplegar
+---
 
-1. Clonar el repositorio:
-   ```bash
-   git clone https://github.com/<usuario>/MLOps-Proyecto2-Airflow-Mlflow.git
-   cd MLOps-Proyecto2-Airflow-Mlflow
-   ```
+## Publicación y Uso de DockerHub
 
-2. Crear el archivo `.env` con:
-   ```dotenv
-   echo -e "AIRFLOW_UID=$(id -u)" > .env
-   ```
+La imagen de **FastAPI** que implementa la API de inferencia ha sido construida y publicada en **Docker Hub** para facilitar el despliegue.
 
-3. Levantar AirFlow
-   ```bash
-   docker-compose up airflow-init
-   ```
-5. Levantar los servicios:
-   ```bash
-   docker-compose up -d
-   ```
+---
 
-6. Acceder a Airflow UI:
-   [http://localhost:8080](http://localhost:8080)
+## Despliegue del Servicio de Inferencia
 
-7. Ejecutar el DAG covertype_workflow desde la interfaz gráfica de Airflow:
+La API de inferencia se despliega en **Docker Compose** con los siguientes parámetros para la imagen:
+
+```yaml
+fastapi:
+  image: camidzn/mlops:api-inference
+  container_name: fastapi_service
+  ports:
+    - "8081:8081"
+  volumes:
+    - models_volume:/opt/airflow/models
+  depends_on:
+    - mysql
+  environment:
+    - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
+    - AWS_ACCESS_KEY_ID=admin
+    - AWS_SECRET_ACCESS_KEY=supersecret
+  deploy:
+    resources:
+      limits:
+        memory: 2000M
+        cpus: "0.5"
+  networks:
+    - mlops_net
+```
+
+---
+
+## Código del archivo `locustfile.py`
+
+El código para realizar las pruebas de carga está en el archivo locustfile.py:
+
+```python
+from locust import HttpUser, task, between
+import random
+
+class UsuarioDeCarga(HttpUser):
+    wait_time = between(1, 2.5)
+
+    @task
+    def hacer_inferencia(self):
+        payload = {
+            "Elevation": round(random.uniform(1000, 3000), 2),
+            "Aspect": round(random.uniform(0, 360), 2),
+            "Slope": round(random.uniform(0, 90), 2),
+            "Horizontal_Distance_To_Hydrology": round(random.uniform(0, 2000), 2),
+            "Vertical_Distance_To_Hydrology": round(random.uniform(-100, 100), 2),
+            "Horizontal_Distance_To_Roadways": round(random.uniform(0, 5000), 2),
+            "Hillshade_9am": round(random.uniform(0, 255), 2),
+            "Hillshade_Noon": round(random.uniform(0, 255), 2),
+            "Hillshade_3pm": round(random.uniform(0, 255), 2),
+            "Horizontal_Distance_To_Fire_Points": round(random.uniform(0, 5000), 2),
+        }
+        response = self.client.post("/predict/", json=payload)
+        if response.status_code != 200:
+            print(f"❌ Error en la inferencia ({response.status_code}): {response.text}")
+```
+
+---
+
+## Configuración y Ejecución de Locust
+
+Archivos de configuración de Locust  
+Se ha creado la carpeta `locust/` con los siguientes archivos:
+
+- `Dockerfile.locust`  
+- `locustfile.py`  
+- `requirements-locust.txt`
+
+---
+
+## Despliegue de Locust
+
+En el archivo `docker-compose.locust.yaml` se configura el servicio de Locust:
+
+```yaml
+services:
+  locust:
+    build:
+      context: ./locust
+      dockerfile: Dockerfile.locust
+    ports:
+      - "8089:8089"
+    environment:
+      - LOCUST_HOST=http://fastapi:8081
+    networks:
+      - taller_locust_mlops_net
+
+networks:
+  taller_locust_mlops_net:
+    external: true
+```
+
+---
+
+## Comando de Ejecución
+
+Para iniciar Locust, ejecuta el siguiente comando:
+
+```bash
+docker-compose -f docker-compose.locust.yaml up --build
+```
+![image](https://github.com/user-attachments/assets/479abfdb-bbaa-4a44-8ce3-dbe843556b1d)
+
+
+---
+
+## Resultados de las Pruebas de Carga
+
+**Prueba de Carga #1**  
+
+- CPU: 0.5  
+- RAM: 2000 MB  
+
+
+![image](https://github.com/user-attachments/assets/4f874708-4ebc-45cb-8769-f9a417bdb0c0)
+
+No se generan fallos, sin embargo los tiempos de respuesta aumentan linealmente llegando por encima de los 500 segundos, lo cual se podría considerar como un comportamiento no aceptable para el rendimiento de la API de inferencia. En relación a las peticiones respondidas por segundo se encuentran alrededor de las 18 RPS.
+
+Al revisar desde Docker Desktop las estadísticas del contenedor encontramos:
+
+![image](https://github.com/user-attachments/assets/cdfe2d68-ca04-4972-9331-bd3a53289169)
+
+Un consumo de memoria RAM promedio de 953MB y un uso de CPU máximo del 50% que se mantiene después de estabilizar el tiempo de respuesta en 600.000ms en locust.
+
+**Prueba de Carga #2**  
+
+Teniendo en cuenta los resultados previos, se reduce la RAM a 1000MB y se aumentan los Cores a 0.75
+a.	CPU: 0.75
+b.	RAM: 1000 MB
+
+Se ejecuta  “docker-compose up -d --no-deps fastapi” para recrear el contenedor de fastapi sin afectar los demás contenedores
+
   
-  Inicia sesión con usuario airflow y contraseña airflow.
+![image](https://github.com/user-attachments/assets/0b8c9ae2-5927-4ae9-ac1f-09a7329e6f68)
+
+No se generan fallos, y en este caso los tiempos de respuesta se estabilizan en 400 segundos, lo cual se podría considerar como un comportamiento no aceptable para el rendimiento de la API de inferencia. En relación a las peticiones respondidas por segundo estas aumentan llegando aproximadamente a las 25 RPS.
+
+Al revisar desde Docker Desktop las estadísticas del contenedor encontramos:
+
+
+![image](https://github.com/user-attachments/assets/f141fdff-9437-426e-b2d1-b6f48a19d540)
+
+Un consumo promedio del 75% de la CPU con un consumo de RAM constante de 997MB aproximadamente.
+
+
+**Prueba de Carga #3**  
+
+Teniendo en cuenta los resultados previos, se mantiene la RAM en 1000MB y se aumentan los Cores a 1.5
+a.	CPU: 1.5
+b.	RAM: 1000 MB
+
+Se ejecuta  “docker-compose up -d --no-deps fastapi” para recrear el contenedor de fastapi sin afectar los demás contenedores
+
+
+![image](https://github.com/user-attachments/assets/4bae93c0-708c-45a1-9270-76f9d4152c1b)
+
+De igual manera No se generan fallos, y en este caso los tiempos de respuesta se estabilizan en 300 segundos, lo cual se podría considerar como un comportamiento aceptable para el rendimiento de la API de inferencia. En relación a las peticiones respondidas por segundo aumentan nuevamente llegando hasta 40 RPS.
+
+Al revisar desde Docker Desktop las estadísticas del contenedor encontramos:
+
+![image](https://github.com/user-attachments/assets/92628617-9f34-4ede-8dec-01faa20bf108)
+
+Un consumo promedio del 100% de la CPU con un consumo de RAM constante de 997MB aproximadamente.
+
+**Prueba de Carga #4**  
+
+Buscando mejorar los tiempos de respuesta promedio y las peticiones por segundo, se mantiene la RAM en 1000MB y se aumentan los Cores a 2
+a.	CPU: 2
+b.	RAM: 1000 MB
+
+Se ejecuta  “docker-compose up -d --no-deps fastapi” para recrear el contenedor de fastapi sin afectar los demás contenedores
+
   
-  Activa el DAG y haz clic en "Trigger DAG" para ejecutarlo.
+![image](https://github.com/user-attachments/assets/cd8260d6-d3d2-4756-bdf3-cf8b5091172d)
 
-8. Acceder a la API de inferencia desde el navegador:
+A pesar del aumento de CPU a 2 Cores los tiempos de respuesta se estabilizan de igual manera en 300 segundos, y las peticiones por segundo se mantienen en 40RPS. Lo que nos permite concluir que a nivel de CPU los valores aceptables que permiten un rendimiento adecuado están alrededor de los 1.5 Cores.
 
-Abre http://localhost:8081/docs.
-
-Selecciona el endpoint /reload_models/, haz clic "Try it out" y ejecuta para que recargue el modelo desde Mlflow.
-
-Selecciona el endpoint /predict/, haz clic en "Try it out" y llena el formulario con las variables numéricas requeridas.
+Al revisar desde Docker Desktop las estadísticas del contenedor encontramos:
 
 
+![image](https://github.com/user-attachments/assets/30800142-7220-4a31-a4cc-2b7ceb4f75a5)
 
+Un consumo promedio del 117% de la CPU con un consumo de RAM constante de 997MB aproximadamente.
+
+---
+
+## Pruebas de Carga con 3 Réplicas
+Teniendo como base los recursos mínimo en 1.5 CPUs y 1000 MB se definen estos recursos limites añadiendo 3 replicar a través del Docker Compose en donde se encuentra la API de Inferencia:
+
+Para generar replicas se modifica el FQDN al que apunta Locust definiendo fastapi, adicionalmente se agregan las replicas, se elimina el container name y los puertos para evitar conflictos de puertos al levantar las replicas.
+
+Configuración de Docker Compose con Réplicas:
+
+```yaml
+fastapi:
+  image: camidzn/mlops:api-inference
+  volumes:
+    - models_volume:/opt/airflow/models
+  depends_on:
+    - mysql
+  environment:
+    - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
+    - AWS_ACCESS_KEY_ID=admin
+    - AWS_SECRET_ACCESS_KEY=supersecret
+  deploy:
+    replicas: 3
+    resources:
+      limits:
+        memory: 1000M
+        cpus: "1.5"
+  networks:
+    - mlops_net
+```
+Docker compose de fastapi incluyendo las replicas:
+
+```yaml
+  ################################################################
+  # FastAPI - Inferencia
+  ################################################################
+  fastapi:
+    image: camidzn/mlops:api-inference
+    volumes:
+      - models_volume:/opt/airflow/models
+    depends_on:
+      - mysql
+    environment:
+      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=supersecret
+    deploy:
+      replicas: 3 #Incrementa el número de replicas
+      resources:
+        limits:
+          memory: 1000M
+          cpus: "1.5"
+    networks:
+      - mlops_net
+
+```
+
+
+
+**Resultados con 3 Réplicas**  
+
+![image](https://github.com/user-attachments/assets/32680e49-cf25-40b5-803d-28d47acab8c6)
+
+A pesar de que se mantuvieron los recursos minimos, al incluir 3 replicas el rendimiento de la API de inferencia aumentó llegando hasta 60 RPS y manteniendo el tiempo de respuesta promedio en 180 segundos.
+
+Por lo que se realiza una prueba adicional de carga reduciendo a 400MB y 0.5CPU, en donde se obtienen los siguiente resultados:
+
+
+![image](https://github.com/user-attachments/assets/5654e930-37c6-479d-9ec0-6d90b638fa1e)
+
+Generando múltiples errores
+Por lo que se procede nuevamente a aumentar la memoria RAM a 1000MB
+
+![image](https://github.com/user-attachments/assets/f7aa2227-5af3-4d28-92a6-f0d5d0a102bc)
+
+Se evidencia que el generar 3 replicas, genera 3 contenedores en donde se balancean automáticamente las peticiones, lo que permite reducir los limites de recurso de  CPU a una tercera parte y la RAM únicamente hasta lo mínimo requerido por la aplicación.
+
+
+---
+
+## Conclusiones
+
+- La API puede manejar muchas peticiones por segundo aumentando recursos.
+- Con 3 réplicas mejora la escalabilidad y reduce los tiempos.
+- La configuración óptima es 1.5 CPUs y 1000 MB de RAM por réplica.
